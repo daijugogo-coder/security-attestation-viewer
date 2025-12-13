@@ -8,7 +8,9 @@ import hashlib
 
 # ----------------------------
 
-APP_DIR = Path(**file**).resolve().parent
+from pathlib import Path
+
+APP_DIR = Path(__file__).resolve().parent
 ATTESTATION_PATH = APP_DIR / "SECURITY_ATTESTATION.md"
 EVIDENCE_ZIP_PATH = APP_DIR / "SECURITY_EVIDENCE.zip"
 
