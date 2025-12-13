@@ -68,7 +68,7 @@ st.header("Evidence Archive (ZIP)")
 if EVIDENCE_ZIP_PATH.exists():
     zip_bytes = EVIDENCE_ZIP_PATH.read_bytes()
 
-```
+
 # Compute hash from bytes (same result as hashing the file)
 computed_sha256 = hashlib.sha256(zip_bytes).hexdigest().upper()
 
@@ -89,7 +89,7 @@ with st.expander("What this proves / what it does NOT prove"):
         "- **Does NOT prove**: the application is 'secure' in any absolute sense.\n"
         "- This is a self-attestation with evidence, not a third-party audit."
     )
-```
+
 
 else:
     st.error(f"Missing file: {EVIDENCE_ZIP_PATH.name}")
