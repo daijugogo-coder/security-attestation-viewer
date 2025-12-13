@@ -29,12 +29,16 @@ st.caption("This page publishes security evidence for verification. It is not a 
 
 # ----------------------------
 
-def sha256_file(path: Path) -> str:
-h = hashlib.sha256()
-with path.open("rb") as f:
-for chunk in iter(lambda: f.read(1024 * 1024), b""):
-h.update(chunk)
-return h.hexdigest().upper()
+import hashlib
+
+def calculate_sha256(file_path):
+    # インデントを修正
+    h = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            h.update(byte_block)
+    return h.hexdigest().upper()
+
 
 # ----------------------------
 
