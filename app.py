@@ -49,11 +49,11 @@ def calculate_sha256(file_path):
 st.header("SECURITY_ATTESTATION.md")
 
 if ATTESTATION_PATH.exists():
-md = ATTESTATION_PATH.read_text(encoding="utf-8", errors="replace")
-st.markdown(md)
+    md = ATTESTATION_PATH.read_text(encoding="utf-8", errors="replace")
+    st.markdown(md)
 else:
-st.error(f"Missing file: {ATTESTATION_PATH.name}")
-st.info("Place SECURITY_ATTESTATION.md in the same folder as app.py.")
+    st.error(f"Missing file: {ATTESTATION_PATH.name}")
+    st.info("Place SECURITY_ATTESTATION.md in the same folder as app.py.")
 
 st.divider()
 
@@ -66,7 +66,7 @@ st.divider()
 st.header("Evidence Archive (ZIP)")
 
 if EVIDENCE_ZIP_PATH.exists():
-zip_bytes = EVIDENCE_ZIP_PATH.read_bytes()
+    zip_bytes = EVIDENCE_ZIP_PATH.read_bytes()
 
 ```
 # Compute hash from bytes (same result as hashing the file)
@@ -92,10 +92,10 @@ with st.expander("What this proves / what it does NOT prove"):
 ```
 
 else:
-st.error(f"Missing file: {EVIDENCE_ZIP_PATH.name}")
-st.info("Place SECURITY_EVIDENCE.zip in the same folder as app.py.")
+    st.error(f"Missing file: {EVIDENCE_ZIP_PATH.name}")
+    st.info("Place SECURITY_EVIDENCE.zip in the same folder as app.py.")
 
-st.divider()
+    st.divider()
 
 # ----------------------------
 
