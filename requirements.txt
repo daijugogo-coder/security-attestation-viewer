@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pdfservices-sdk
+streamlit>=1.36
