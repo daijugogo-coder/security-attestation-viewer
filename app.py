@@ -1,6 +1,9 @@
-import streamlit as st
+"""Security Attestation Viewer Streamlit app."""
+
 from pathlib import Path
 import hashlib
+
+import streamlit as st
 
 # ----------------------------
 
@@ -8,31 +11,28 @@ import hashlib
 
 # ----------------------------
 
-from pathlib import Path
-
 APP_DIR = Path(__file__).resolve().parent
 ATTESTATION_PATH = APP_DIR / "SECURITY_ATTESTATION.md"
 EVIDENCE_ZIP_PATH = APP_DIR / "SECURITY_EVIDENCE.zip"
 
 st.set_page_config(
-page_title="Security Attestation Viewer",
-page_icon="🛡️",
-layout="centered",
+    page_title="Security Attestation Viewer",
+    page_icon="🛡️",
+    layout="centered",
 )
 
 st.title("🛡️ Security Attestation Viewer")
-st.caption("This page publishes security evidence for verification. It is not a formal certification.")
+st.caption(
+    "This page publishes security evidence for verification. "
+    "It is not a formal certification."
+)
 
 # ----------------------------
-
 # Helpers
-
 # ----------------------------
-
-import hashlib
 
 def calculate_sha256(file_path):
-    # インデントを修正
+    """Return the SHA256 hex digest (uppercase) of the given file path."""
     h = hashlib.sha256()
     with open(file_path, "rb") as f:
         for byte_block in iter(lambda: f.read(4096), b""):
@@ -63,39 +63,42 @@ st.divider()
 
 # ----------------------------
 
-st.header("Evidence Archive (ZIP)")
+def render_evidence_archive():
+    """Render the Evidence Archive section, including SHA256 and download."""
+    st.header("Evidence Archive (ZIP)")
+    if EVIDENCE_ZIP_PATH.exists():
+        zip_bytes = EVIDENCE_ZIP_PATH.read_bytes()
 
-if EVIDENCE_ZIP_PATH.exists():
-    zip_bytes = EVIDENCE_ZIP_PATH.read_bytes()
+        # Compute hash from bytes (same result as hashing the file)
+        computed_sha256 = hashlib.sha256(zip_bytes).hexdigest().upper()
 
+        st.subheader("SHA256")
+        st.code(computed_sha256, language="text")
 
-# Compute hash from bytes (same result as hashing the file)
-computed_sha256 = hashlib.sha256(zip_bytes).hexdigest().upper()
+        st.download_button(
+            label="Download SECURITY_EVIDENCE.zip",
+            data=zip_bytes,
+            file_name="SECURITY_EVIDENCE.zip",
+            mime="application/zip",
+            use_container_width=True,
+        )
 
-st.subheader("SHA256")
-st.code(computed_sha256, language="text")
+        with st.expander("What this proves / what it does NOT prove"):
+            st.markdown(
+                "- **Proves**: the downloaded ZIP matches the SHA256 shown above (integrity).\n"
+                "- **Does NOT prove**: the application is 'secure' in any absolute sense.\n"
+                "- This is a self-attestation with evidence, not a third-party audit."
+            )
 
-st.download_button(
-    label="Download SECURITY_EVIDENCE.zip",
-    data=zip_bytes,
-    file_name="SECURITY_EVIDENCE.zip",
-    mime="application/zip",
-    use_container_width=True,
-)
+        st.divider()
+    else:
+        st.error(f"Missing file: {EVIDENCE_ZIP_PATH.name}")
+        st.info("Place SECURITY_EVIDENCE.zip in the same folder as app.py.")
 
-with st.expander("What this proves / what it does NOT prove"):
-    st.markdown(
-        "- **Proves**: the downloaded ZIP matches the SHA256 shown above (integrity).\n"
-        "- **Does NOT prove**: the application is 'secure' in any absolute sense.\n"
-        "- This is a self-attestation with evidence, not a third-party audit."
-    )
+        st.divider()
 
-
-else:
-    st.error(f"Missing file: {EVIDENCE_ZIP_PATH.name}")
-    st.info("Place SECURITY_EVIDENCE.zip in the same folder as app.py.")
-
-    st.divider()
+# Render evidence section
+render_evidence_archive()
 
 # ----------------------------
 
@@ -106,11 +109,11 @@ else:
 st.header("How to verify locally (Windows PowerShell)")
 
 st.code(
-r"""# 1) Download SECURITY_EVIDENCE.zip from this page
+    r"""# 1) Download SECURITY_EVIDENCE.zip from this page
 
 # 2) Run:
 
 Get-FileHash .\SECURITY_EVIDENCE.zip -Algorithm SHA256
 """,
-language="powershell",
+    language="powershell",
 )
