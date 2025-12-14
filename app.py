@@ -1,19 +1,12 @@
-"""Security Attestation Viewer Streamlit app."""
+"""Security Attestation Viewer Streamlit app (upload-based)."""
 
-from pathlib import Path
 import hashlib
+import io
+import re
+import zipfile
 
 import streamlit as st
 
-# ----------------------------
-
-# Configuration (files are expected to be in the same folder as this app.py)
-
-# ----------------------------
-
-APP_DIR = Path(__file__).resolve().parent
-ATTESTATION_PATH = APP_DIR / "SECURITY_ATTESTATION.md"
-EVIDENCE_ZIP_PATH = APP_DIR / "SECURITY_EVIDENCE.zip"
 
 st.set_page_config(
     page_title="Security Attestation Viewer",
@@ -23,97 +16,87 @@ st.set_page_config(
 
 st.title("🛡️ Security Attestation Viewer")
 st.caption(
-    "This page publishes security evidence for verification. "
-    "It is not a formal certification."
+    "Verify an uploaded evidence ZIP (integrity check). "
+    "This is not a formal certification."
 )
 
 # ----------------------------
 # Helpers
 # ----------------------------
 
-def calculate_sha256(file_path):
-    """Return the SHA256 hex digest (uppercase) of the given file path."""
+def sha256_bytes(data: bytes) -> str:
+    """Return SHA256 hex digest (uppercase) for bytes."""
     h = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
-            h.update(byte_block)
+    h.update(data)
     return h.hexdigest().upper()
 
 
-# ----------------------------
+def extract_attestation_md(zip_bytes: bytes) -> tuple[str | None, list[str]]:
+    """Extract SECURITY_ATTESTATION.md text from the ZIP (in-memory)."""
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
+        names = z.namelist()
 
-# Attestation
+        # allow either root or subfolder path
+        candidates = [n for n in names if n.endswith("SECURITY_ATTESTATION.md")]
+        if not candidates:
+            return None, names
 
-# ----------------------------
+        md_name = candidates[0]
+        md_bytes = z.read(md_name)
+        md_text = md_bytes.decode("utf-8", errors="replace")
+        return md_text, names
 
-st.header("SECURITY_ATTESTATION.md")
 
-if ATTESTATION_PATH.exists():
-    md = ATTESTATION_PATH.read_text(encoding="utf-8", errors="replace")
-    st.markdown(md)
-else:
-    st.error(f"Missing file: {ATTESTATION_PATH.name}")
-    st.info("Place SECURITY_ATTESTATION.md in the same folder as app.py.")
+def find_sha256_in_markdown(md_text: str) -> str | None:
+    """Find 'SHA256: <64hex>' in markdown."""
+    m = re.search(r"SHA256\s*:\s*([0-9a-fA-F]{64})", md_text)
+    return m.group(1).upper() if m else None
 
-st.divider()
-
-# ----------------------------
-
-# Evidence ZIP + SHA256
-
-# ----------------------------
-
-def render_evidence_archive():
-    """Render the Evidence Archive section, including SHA256 and download."""
-    st.header("Evidence Archive (ZIP)")
-    if EVIDENCE_ZIP_PATH.exists():
-        zip_bytes = EVIDENCE_ZIP_PATH.read_bytes()
-
-        # Compute hash from bytes (same result as hashing the file)
-        computed_sha256 = hashlib.sha256(zip_bytes).hexdigest().upper()
-
-        st.subheader("SHA256")
-        st.code(computed_sha256, language="text")
-
-        st.download_button(
-            label="Download SECURITY_EVIDENCE.zip",
-            data=zip_bytes,
-            file_name="SECURITY_EVIDENCE.zip",
-            mime="application/zip",
-            use_container_width=True,
-        )
-
-        with st.expander("What this proves / what it does NOT prove"):
-            st.markdown(
-                "- **Proves**: the downloaded ZIP matches the SHA256 shown above (integrity).\n"
-                "- **Does NOT prove**: the application is 'secure' in any absolute sense.\n"
-                "- This is a self-attestation with evidence, not a third-party audit."
-            )
-
-        st.divider()
-    else:
-        st.error(f"Missing file: {EVIDENCE_ZIP_PATH.name}")
-        st.info("Place SECURITY_EVIDENCE.zip in the same folder as app.py.")
-
-        st.divider()
-
-# Render evidence section
-render_evidence_archive()
 
 # ----------------------------
-
-# Quick verification instructions
-
+# UI
 # ----------------------------
 
-st.header("How to verify locally (Windows PowerShell)")
-
-st.code(
-    r"""# 1) Download SECURITY_EVIDENCE.zip from this page
-
-# 2) Run:
-
-Get-FileHash .\SECURITY_EVIDENCE.zip -Algorithm SHA256
-""",
-    language="powershell",
+st.header("1) Upload evidence ZIP")
+uploaded = st.file_uploader(
+    "Drop SECURITY_EVIDENCE.zip here",
+    type=["zip"],
+    accept_multiple_files=False,
 )
+
+if uploaded is None:
+    st.info("ZIPをアップロードしてください（このアプリはサーバ側にmd/zipを保持しません）。")
+    st.stop()
+
+zip_bytes = uploaded.read()
+zip_hash = sha256_bytes(zip_bytes)
+
+st.header("2) ZIP SHA256")
+st.code(zip_hash, language="text")
+
+md_text, file_list = extract_attestation_md(zip_bytes)
+
+st.header("3) ZIP contents")
+st.write(f"{len(file_list)} files found.")
+with st.expander("Show file list"):
+    for n in file_list:
+        st.write(f"- {n}")
+
+st.header("4) SECURITY_ATTESTATION.md (from ZIP)")
+if md_text is None:
+    st.error("ZIP内に SECURITY_ATTESTATION.md が見つかりません。")
+    st.stop()
+
+st.markdown(md_text)
+
+st.header("5) Consistency check")
+embedded = find_sha256_in_markdown(md_text)
+if embedded is None:
+    st.warning("SECURITY_ATTESTATION.md 内に 'SHA256: <64hex>' が見つかりません。照合できません。")
+else:
+    if embedded == zip_hash:
+        st.success("一致：md記載のSHA256と、アップロードZIPのSHA256が一致しました。")
+    else:
+        st.error("不一致：md記載のSHA256と、アップロードZIPのSHA256が一致しません。")
+
+st.caption("Note: Verification is performed in-memory; uploaded files are not persisted by this app.")
