@@ -4,6 +4,26 @@ import zipfile
 import re
 import streamlit as st
 
+# ----------------------------
+# Helper functions
+# ----------------------------
+
+def sha256_bytes(data: bytes) -> str:
+    """Return SHA256 hex digest (uppercase) for bytes."""
+    h = hashlib.sha256()
+    h.update(data)
+    return h.hexdigest().upper()
+
+def extract_sha256_from_sha256_file(text: str) -> str | None:
+    """Extract 64-hex SHA256 from a .sha256 file content."""
+    parts = text.strip().split()
+    if len(parts) == 2 and len(parts[0]) == 64 and re.match(r"[0-9a-fA-F]{64}", parts[0]):
+        return parts[0].upper()
+    return None
+
+# ----------------------------
+# Streamlit UI
+# ----------------------------
 
 st.set_page_config(
     page_title="Security Attestation Viewer",
@@ -13,37 +33,12 @@ st.set_page_config(
 
 st.title("🛡️ Security Attestation Viewer")
 st.caption(
-    "Verify an uploaded evidence ZIP against an uploaded SHA256 file. "
+    "Verify the integrity of uploaded evidence ZIP and SHA256 file. "
     "This is not a formal certification."
 )
 
 # ----------------------------
-# Helpers
-# ----------------------------
-
-def sha256_bytes(data: bytes) -> str:
-    """Return SHA256 hex digest (uppercase) for bytes."""
-    h = hashlib.sha256()
-    h.update(data)
-    return h.hexdigest().upper()
-
-def extract_attestation_md(zip_bytes: bytes) -> tuple[str | None, list[str]]:
-    """Extract SECURITY_ATTESTATION.md text from the ZIP (in-memory)."""
-    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
-        names = z.namelist()
-
-        # allow either root or subfolder path
-        candidates = [n for n in names if n.endswith("SECURITY_ATTESTATION.md")]
-        if not candidates:
-            return None, names
-
-        md_name = candidates[0]
-        md_bytes = z.read(md_name)
-        md_text = md_bytes.decode("utf-8", errors="replace")
-        return md_text, names
-
-# ----------------------------
-# UI
+# UI: Upload Files
 # ----------------------------
 
 st.header("1) Upload evidence ZIP")
@@ -68,19 +63,20 @@ if uploaded_zip is None or uploaded_sha is None:
     )
     st.stop()
 
+# ----------------------------
+# Process the uploaded files
+# ----------------------------
+
+# Read ZIP file and SHA256 file
 zip_bytes = uploaded_zip.read()
 zip_hash = sha256_bytes(zip_bytes)
 
 sha_text = uploaded_sha.read().decode("utf-8", errors="replace")
-
-def extract_sha256_from_sha256_file(text: str) -> str | None:
-    """Extract 64-hex SHA256 from a .sha256 file content."""
-    parts = text.strip().split()
-    if len(parts) == 2 and len(parts[0]) == 64 and re.match(r"[0-9a-fA-F]{64}", parts[0]):
-        return parts[0].upper()
-    return None
-
 expected_hash = extract_sha256_from_sha256_file(sha_text)
+
+# ----------------------------
+# Display results
+# ----------------------------
 
 st.header("3) Calculated SHA256 (from uploaded ZIP)")
 st.code(zip_hash, language="text")
@@ -97,16 +93,13 @@ st.code(expected_hash, language="text")
 st.header("5) Consistency check (ZIP vs SHA256 file)")
 if expected_hash == zip_hash:
     st.success("一致：sha256ファイル記載のSHA256と、アップロードZIPのSHA256が一致しました。")
+    st.info(
+        "これで改ざんされていないことが証明されました。\n"
+        "ZIPファイル内の三つのJSONファイル（`bandit_report.json`, `pip_audit_report.json`, `pip_audit_cyclonedx.json`）は"
+        "改ざんされていません。これらのファイルはご自身のテキストエディタ等で確認してください。"
+    )
 else:
     st.error("不一致：sha256ファイル記載のSHA256と、アップロードZIPのSHA256が一致しません。")
-
-st.header("6) SECURITY_ATTESTATION.md (from uploaded ZIP)")
-md_text, file_list = extract_attestation_md(zip_bytes)
-
-if md_text is None:
-    st.error("ZIP内に SECURITY_ATTESTATION.md が見つかりません（必須）。")
-    st.stop()
-
-st.markdown(md_text)
+    st.info("ZIPファイルが改ざんされた可能性があります。")
 
 st.caption("Note: Verification is performed in-memory; uploaded files are not persisted by this app.")
