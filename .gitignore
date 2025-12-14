@@ -1,0 +1,3 @@
+# Ignore certificate and evidence files
+SECURITY_ATTESTATION.md
+SECURITY_EVIDENCE.zip
